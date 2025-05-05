@@ -86,55 +86,71 @@ MID="├$(line $CMD_W)┼$(line $STATE_W)┼$(line $EXPECT_W)┼$(line $COMP_W)�
 BOT="└$(line $CMD_W)┴$(line $STATE_W)┴$(line $EXPECT_W)┴$(line $COMP_W)┘"
 
 print_header() {
-  echo -e "$TOP"
-  printf "│ %-*s│ %-*s│ %-*s│ %-*s│\n" \
-         $((CMD_W-1)) COMMAND  $((STATE_W-1)) STATE  \
-         $((EXPECT_W-1)) EXPECT  $((COMP_W-1)) COMPLIANT
-  echo -e "$MID"
+  echo "$TOP"
+  local fmt="│ %-*s│ %-*s│ %-*s│ %-*s│\n"
+  local args=(
+    "$fmt"
+    "$((CMD_W-1))" COMMAND
+    "$((STATE_W-1))" STATE
+    "$((EXPECT_W-1))" EXPECT
+    "$((COMP_W-1))" COMPLIANT
+  )
+  printf "${args[@]}"
+  echo "$MID"
 }
+
+
 
 ###############################################################################
 # 7)  Audit‑Loop mit bündiger, farbsicherer Ausgabe
 ###############################################################################
 viol=0
 for user in "${ADMIN_USERS[@]}"; do
-  echo -e "\n🔍  Auditing ${YELLOW}$user${NC}"
-  print_header
+    echo -e "\n🔍  Auditing ${YELLOW}$user${NC}"
+    print_header
 
-  output_row(){        # $1=cmd  $2=state $3=expect $4=yes/no
-    local col=$([[ $4 == YES ]] && echo "$GREEN" || echo "$RED")
-    printf "│ %-*.*s│ %-*s│ %-*s│ %s%-*s%s│\n" \
-           $((CMD_W-1)) $((CMD_W-1)) "$1" \
-           $((STATE_W-1)) "$2" \
-           $((EXPECT_W-1)) "$3" \
-           "$col" $((COMP_W-1)) "$4" "$NC"
-  }
+    output_row(){  # $1=cmd $2=state $3=expect $4=yes/no
+    local col
+    if [[ $4 == YES ]]; then col="$GREEN"; else col="$RED"; fi
 
-  # -------- ALWAYS_BLOCK
-  for cmd in "${ALWAYS_BLOCK[@]}"; do
+    local fmt="│ %-*.*s│ %-*s│ %-*s│ %s%-*s%s│\n"
+    local args=(
+        "$fmt"
+        "$((CMD_W-1))" "$((CMD_W-1))" "$1"
+        "$((STATE_W-1))" "$2"
+        "$((EXPECT_W-1))" "$3"
+        "$col"              # Farbe für COMPLIANT
+        "$((COMP_W-1))" "$4" "$NC"
+    )
+    printf "${args[@]}"
+    }
+
+
+    # -------- ALWAYS_BLOCK
+    for cmd in "${ALWAYS_BLOCK[@]}"; do
     st=$(check_base_state "$user" "$cmd")
     ok=$([[ $st =~ ^(BLOCKED|NOT_INSTALLED)$ ]] && echo YES || echo NO)
     [[ $ok == NO ]] && viol=1
     output_row "$cmd" "$st" BLOCKED "$ok"
-  done
+    done
 
-  # -------- ALLOW_NOEXEC
-  for cmd in "${ALLOW_NOEXEC[@]}"; do
+    # -------- ALLOW_NOEXEC
+    for cmd in "${ALLOW_NOEXEC[@]}"; do
     base=$(check_base_state "$user" "$cmd")
     case "$base" in
-      BLOCKED|NOT_INSTALLED) st=$base ;;
-      NOPASSWD|PASSWD)
+        BLOCKED|NOT_INSTALLED) st=$base ;;
+        NOPASSWD|PASSWD)
         [[ $(check_noexec_flag "$user" "$cmd") == UNSET ]] && st=NOEXEC_MISSING || {
-          [[ $base == NOPASSWD ]] && st=$(check_noexec_enforced "$user" "$cmd") || st=NOEXEC_SET
+            [[ $base == NOPASSWD ]] && st=$(check_noexec_enforced "$user" "$cmd") || st=NOEXEC_SET
         }
         ;;
     esac
     ok=$([[ $st =~ ^(ENFORCED|NOEXEC_SET|BLOCKED|NOT_INSTALLED)$ ]] && echo YES || echo NO)
     [[ $ok == NO ]] && viol=1
     output_row "$cmd" "$st" NOEXEC "$ok"
-  done
+    done
 
-  echo -e "$BOT"
+    echo -e "$BOT"
 done
 
 ###############################################################################
