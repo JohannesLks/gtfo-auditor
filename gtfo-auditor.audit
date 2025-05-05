@@ -1,23 +1,14 @@
-#!/bin/bash
+<check_type:"Unix">
+
+
+    <custom_item>
+        system      : "Linux"
+        type        : CMD_EXEC
+        description : "gtfo Audit"
+        cmd         : "#!/usr/bin/env bash
 # gtfo‑auditor.sh
 # Prüft Sudo‑Policies auf verbotene Shell‑Escapes, NOEXEC‑Bypässe und Fehlkonfigurationen.
 # Exit‑Codes: 0 = Policy OK, 1 = Verstöße, 2 = Aufruf‑/Systemfehler
-
-###############################################################################
-# Banner
-###############################################################################
-cat <<'BANNER'
-   _____ _______ ______ ____                      _ _ _             
-  / ____|__   __|  ____/ __ \      /\            | (_) |            
- | |  __   | |  | |__ | |  | |    /  \  _   _  __| |_| |_ ___  _ __ 
- | | |_ |  | |  |  __|| |  | |   / /\ \| | | |/ _` | | __/ _ \| '__|
- | |__| |  | |  | |   | |__| |  / ____ \ |_| | (_| | | || (_) | |   
-  \_____|  |_|  |_|    \____/  /_/    \_\__,_|\__,_|_|\__\___/|_|   
-                                                                    
-                                                                    
-(c) 2025  JohannesLks
-
-BANNER
 ###############################################################################
 # 1) Listen – bei Bedarf anpassen/erweitern
 ###############################################################################
@@ -30,13 +21,16 @@ ALLOW_NOEXEC=(/usr/bin/7z /usr/bin/aa-exec /usr/bin/ab /usr/bin/alpine /usr/bin/
 ###############################################################################
 # 2)  Farben
 ###############################################################################
-RED=$'\e[0;31m'; GREEN=$'\e[0;32m'; YELLOW=$'\e[0;33m'; NC=$'\e[0m'
+RED=\"\"
+GREEN=\"\"
+YELLOW=\"\"
+NC=\"\"
 
 ###############################################################################
 # 3)  Root‑Check
 ###############################################################################
 if [[ $(id -u) -ne 0 ]]; then
-    echo -e "${RED}❌  Root required (id -u check).${NC}"
+    echo -e \"${RED}❌  Root required (id -u check).${NC}\"
     id
     whoami
     exit 2
@@ -46,25 +40,25 @@ fi
 # 4)  Hilfsfunktionen (unverändert)
 ###############################################################################
 check_base_state() {              # NOT_INSTALLED / BLOCKED / PASSWD / NOPASSWD
-  local user="$1" bin="$2"
+  local user=\"$1\" bin=\"$2\"
   [[ ! -e $bin ]] && { echo NOT_INSTALLED; return; }
 
-  if sudo -n -l -U "$user" "$bin" &>/dev/null; then
-      runuser -u "$user" -- sudo -n "$bin" -c true &>/dev/null && echo NOPASSWD || echo PASSWD
+  if sudo -n -l -U \"$user\" \"$bin\" &>/dev/null; then
+      runuser -u \"$user\" -- sudo -n \"$bin\" -c true &>/dev/null && echo NOPASSWD || echo PASSWD
   else
       echo BLOCKED
   fi
 }
 
-check_noexec_flag()      { sudo -n -l -U "$1" "$2" 2>/dev/null | grep -q NOEXEC && echo SET || echo UNSET; }
+check_noexec_flag()      { sudo -n -l -U \"$1\" \"$2\" 2>/dev/null | grep -q NOEXEC && echo SET || echo UNSET; }
 check_noexec_enforced()  {                                  # ENFORCED / BYPASSED / UNKNOWN
-  local u="$1" b="$2" o
-  case "$b" in
-    */vim|*/vi|*/view)   o=$(runuser -u "$u" -- sudo -n "$b" -c ':!whoami' 2>/dev/null);;
-    */less)              o=$(echo '!whoami' | runuser -u "$u" -- sudo -n "$b" 2>/dev/null);;
-    */python*|*/python3) o=$(runuser -u "$u" -- sudo -n "$b" -c 'import os,sys;os.system("whoami")' 2>/dev/null);;
-    */perl)              o=$(runuser -u "$u" -- sudo -n "$b" -e 'system("whoami")' 2>/dev/null);;
-    */awk)               o=$(runuser -u "$u" -- sudo -n "$b" 'BEGIN{system("whoami")}' 2>/dev/null);;
+  local u=\"$1\" b=\"$2\" o
+  case \"$b\" in
+    */vim|*/vi|*/view)   o=$(runuser -u \"$u\" -- sudo -n \"$b\" -c ':!whoami' 2>/dev/null);;
+    */less)              o=$(echo '!whoami' | runuser -u \"$u\" -- sudo -n \"$b\" 2>/dev/null);;
+    */python*|*/python3) o=$(runuser -u \"$u\" -- sudo -n \"$b\" -c 'import os,sys;os.system(\"whoami\")' 2>/dev/null);;
+    */perl)              o=$(runuser -u \"$u\" -- sudo -n \"$b\" -e 'system(\"whoami\")' 2>/dev/null);;
+    */awk)               o=$(runuser -u \"$u\" -- sudo -n \"$b\" 'BEGIN{system(\"whoami\")}' 2>/dev/null);;
     *) echo UNKNOWN; return;;
   esac
   [[ $o == root ]] && echo BYPASSED || echo ENFORCED
@@ -75,84 +69,110 @@ check_noexec_enforced()  {                                  # ENFORCED / BYPASSE
 ###############################################################################
 ADMIN_USERS=()
 for g in sudo wheel admin; do
-  [[ $(getent group "$g") ]] && IFS=, read -ra m <<<"$(getent group "$g"|cut -d: -f4)" && ADMIN_USERS+=("${m[@]}")
+  [[ $(getent group \"$g\") ]] && IFS=, read -ra m <<<\"$(getent group \"$g\"|cut -d: -f4)\" && ADMIN_USERS+=(\"${m[@]}\")
 done
 [[ ${#ADMIN_USERS[@]} -eq 0 ]] && mapfile -t ADMIN_USERS < <(awk -F: '$3>=1000{print $1}' /etc/passwd)
-[[ ${#ADMIN_USERS[@]} -eq 0 ]] && { echo "Keine Audit‑User."; exit 2; }
+[[ ${#ADMIN_USERS[@]} -eq 0 ]] && { echo \"Keine Audit‑User.\"; exit 2; }
 
 ###############################################################################
 # 6)  Tabellenbreite & Rahmen
 ###############################################################################
-all_cmds=$(printf "%s\n" "${ALWAYS_BLOCK[@]}" "${ALLOW_NOEXEC[@]}")
-max_cmd_len=$(echo "$all_cmds" | awk '{print length}' | sort -nr | head -1)
-[ "$max_cmd_len" -lt 25 ] && max_cmd_len=25
+all_cmds=$(printf \"%s\\n\" \"${ALWAYS_BLOCK[@]}\" \"${ALLOW_NOEXEC[@]}\")
+max_cmd_len=$(echo \"$all_cmds\" | awk '{print length}' | sort -nr | head -1)
+[ \"$max_cmd_len\" -lt 25 ] && max_cmd_len=25
 CMD_W=$(( max_cmd_len + 2 ))
 
-# längster State‑String => "NOEXEC_MISSING" (14) – +2 Padding
+# längster State‑String => \"NOEXEC_MISSING\" (14) – +2 Padding
 STATE_W=16
 EXPECT_W=10
 COMP_W=10
 
-line(){ printf '─%.0s' $(seq 1 "$1"); }
-TOP="┌$(line $CMD_W)┬$(line $STATE_W)┬$(line $EXPECT_W)┬$(line $COMP_W)┐"
-MID="├$(line $CMD_W)┼$(line $STATE_W)┼$(line $EXPECT_W)┼$(line $COMP_W)┤"
-BOT="└$(line $CMD_W)┴$(line $STATE_W)┴$(line $EXPECT_W)┴$(line $COMP_W)┘"
+line(){ printf '─%.0s' $(seq 1 \"$1\"); }
+TOP=\"┌$(line $CMD_W)┬$(line $STATE_W)┬$(line $EXPECT_W)┬$(line $COMP_W)┐\"
+MID=\"├$(line $CMD_W)┼$(line $STATE_W)┼$(line $EXPECT_W)┼$(line $COMP_W)┤\"
+BOT=\"└$(line $CMD_W)┴$(line $STATE_W)┴$(line $EXPECT_W)┴$(line $COMP_W)┘\"
 
 print_header() {
-  echo -e "$TOP"
-  printf "│ %-*s│ %-*s│ %-*s│ %-*s│\n" \
-         $((CMD_W-1)) COMMAND  $((STATE_W-1)) STATE  \
-         $((EXPECT_W-1)) EXPECT  $((COMP_W-1)) COMPLIANT
-  echo -e "$MID"
+  echo \"$TOP\"
+  local fmt=\"│ %-*s│ %-*s│ %-*s│ %-*s│\\n\"
+  local args=(
+    \"$fmt\"
+    \"$((CMD_W-1))\" COMMAND
+    \"$((STATE_W-1))\" STATE
+    \"$((EXPECT_W-1))\" EXPECT
+    \"$((COMP_W-1))\" COMPLIANT
+  )
+  printf \"${args[@]}\"
+  echo \"$MID\"
 }
+
+
 
 ###############################################################################
 # 7)  Audit‑Loop mit bündiger, farbsicherer Ausgabe
 ###############################################################################
 viol=0
-for user in "${ADMIN_USERS[@]}"; do
-  echo -e "\n🔍  Auditing ${YELLOW}$user${NC}"
-  print_header
+for user in \"${ADMIN_USERS[@]}\"; do
+    echo -e \"\\n🔍  Auditing ${YELLOW}$user${NC}\"
+    print_header
 
-  output_row(){        # $1=cmd  $2=state $3=expect $4=yes/no
-    local col=$([[ $4 == YES ]] && echo "$GREEN" || echo "$RED")
-    printf "│ %-*.*s│ %-*s│ %-*s│ %s%-*s%s│\n" \
-           $((CMD_W-1)) $((CMD_W-1)) "$1" \
-           $((STATE_W-1)) "$2" \
-           $((EXPECT_W-1)) "$3" \
-           "$col" $((COMP_W-1)) "$4" "$NC"
-  }
+    output_row(){  # $1=cmd $2=state $3=expect $4=yes/no
+    local col
+    if [[ $4 == YES ]]; then col=\"$GREEN\"; else col=\"$RED\"; fi
 
-  # -------- ALWAYS_BLOCK
-  for cmd in "${ALWAYS_BLOCK[@]}"; do
-    st=$(check_base_state "$user" "$cmd")
+    local fmt=\"│ %-*.*s│ %-*s│ %-*s│ %s%-*s%s│\\n\"
+    local args=(
+        \"$fmt\"
+        \"$((CMD_W-1))\" \"$((CMD_W-1))\" \"$1\"
+        \"$((STATE_W-1))\" \"$2\"
+        \"$((EXPECT_W-1))\" \"$3\"
+        \"$col\"              # Farbe für COMPLIANT
+        \"$((COMP_W-1))\" \"$4\" \"$NC\"
+    )
+    printf \"${args[@]}\"
+    }
+
+
+    # -------- ALWAYS_BLOCK
+    for cmd in \"${ALWAYS_BLOCK[@]}\"; do
+    st=$(check_base_state \"$user\" \"$cmd\")
     ok=$([[ $st =~ ^(BLOCKED|NOT_INSTALLED)$ ]] && echo YES || echo NO)
     [[ $ok == NO ]] && viol=1
-    output_row "$cmd" "$st" BLOCKED "$ok"
-  done
+    output_row \"$cmd\" \"$st\" BLOCKED \"$ok\"
+    done
 
-  # -------- ALLOW_NOEXEC
-  for cmd in "${ALLOW_NOEXEC[@]}"; do
-    base=$(check_base_state "$user" "$cmd")
-    case "$base" in
-      BLOCKED|NOT_INSTALLED) st=$base ;;
-      NOPASSWD|PASSWD)
-        [[ $(check_noexec_flag "$user" "$cmd") == UNSET ]] && st=NOEXEC_MISSING || {
-          [[ $base == NOPASSWD ]] && st=$(check_noexec_enforced "$user" "$cmd") || st=NOEXEC_SET
+    # -------- ALLOW_NOEXEC
+    for cmd in \"${ALLOW_NOEXEC[@]}\"; do
+    base=$(check_base_state \"$user\" \"$cmd\")
+    case \"$base\" in
+        BLOCKED|NOT_INSTALLED) st=$base ;;
+        NOPASSWD|PASSWD)
+        [[ $(check_noexec_flag \"$user\" \"$cmd\") == UNSET ]] && st=NOEXEC_MISSING || {
+            [[ $base == NOPASSWD ]] && st=$(check_noexec_enforced \"$user\" \"$cmd\") || st=NOEXEC_SET
         }
         ;;
     esac
     ok=$([[ $st =~ ^(ENFORCED|NOEXEC_SET|BLOCKED|NOT_INSTALLED)$ ]] && echo YES || echo NO)
     [[ $ok == NO ]] && viol=1
-    output_row "$cmd" "$st" NOEXEC "$ok"
-  done
+    output_row \"$cmd\" \"$st\" NOEXEC \"$ok\"
+    done
 
-  echo -e "$BOT"
+    echo -e \"$BOT\"
 done
 
 ###############################################################################
 # 8)  Gesamtergebnis
 ###############################################################################
-echo "==============================================================="
-(( viol )) && { echo -e "${RED}❌  VIOLATIONS DETECTED${NC}"; exit 1; }
-echo -e "${GREEN}✅  POLICY OK${NC}"
+echo \"===============================================================\"
+(( viol )) && { echo -e \"${RED}❌  VIOLATIONS DETECTED${NC}\"; exit 1; }
+echo -e \"${GREEN}✅  POLICY OK${NC}\"
+
+
+
+
+"
+        expect      : "POLICY OK"
+    </custom_item>
+      
+
+</check_type>
