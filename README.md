@@ -111,10 +111,3 @@ This tool **simulates attacks** using real shell escape techniques. It should be
 ## License
 
 MIT License – see `LICENSE` file.
-
----
-
-## Contributions Welcome
-
-Got a bypass technique? Add a case block. Found a false negative? File an issue or pull request.
-
