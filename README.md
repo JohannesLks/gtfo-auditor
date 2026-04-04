@@ -44,7 +44,7 @@ The goal of `gtfo-auditor` is to **simulate these exact escape techniques** and 
 ## Installation
 
 ```bash
-git clone https://github.com/YOURUSERNAME/gtfo-auditor.git
+git clone https://github.com/JohannesLks/gtfo-auditor.git
 cd gtfo-auditor
 chmod +x gtfo-auditor.sh
 ````
